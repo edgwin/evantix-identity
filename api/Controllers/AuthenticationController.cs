@@ -22,6 +22,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace IdentityService.Controllers
 {    
@@ -173,16 +174,15 @@ namespace IdentityService.Controllers
                         throw new Exception(_localizer["Fallo al guardar el historial de la contraseña"].Value);
                     //Send email to confirm account
                     var emailToken = _userManager.GenerateEmailConfirmationTokenAsync(user).Result;
-                    var confirmationLink = Url.Action("ConfirmEmail", "api/Auth", new
-                    {
-                        userid = user.Id,
-                        token = emailToken
-                    },
-                    protocol: HttpContext.Request.Scheme);
-
+                    emailToken = HttpUtility.UrlEncode(emailToken);
                     var system = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                         .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.Nombre;
 
+                    var systemUrl = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
+                        .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.HomePage;
+
+                    var confirmationLink = $"{systemUrl}api/Auth/ConfirmEmail?userid={user.Id}&token={emailToken}";
+                    
                     var emailDto = new EmailDto()
                     {
                         Body = string.Format(_localizer["Hola {0} {1} <br />Gracias por tu interes en {2}.<br />Tu cuenta esta casi lista para ser usada. Solo un paso mas, por favor da click en la liga de abajo para activar tu cuenta.<br /><br />{3} <br /><br />Si la liga no funciona, copia y pegala en tu navegador de internet.<br/>El equipo de {2}."].Value, model.FirstName, model.LastName, system, confirmationLink),
@@ -223,10 +223,11 @@ namespace IdentityService.Controllers
                 if (result.Succeeded)
                 {
                     string url = _db.UserApplications.Where(up => up.ApplicationUser.Id == userId).Select(up => up.Applications.Url).FirstOrDefault();
-                    return Redirect(url);
+                    return new OkObjectResult(new { status = "OK", callback= $"{url}"});
                 }
-                return null;
-            }catch(Exception ex)
+                return BadRequest(ErrorHelper.GetErrors(result, _localizer));
+            }
+            catch(Exception ex)
             {
                 return BadRequest(ex.Message);
             }
