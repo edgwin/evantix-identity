@@ -135,7 +135,7 @@ namespace IdentityService.Controllers
         [HttpPost]
         [Route("Create")]
         [AllowAnonymous]
-        public async Task<IActionResult> CreateUser(UserModel model)
+        public async Task<IActionResult> CreateUser([FromBody]UserModel model)
         {
             if (model == null)
                 return BadRequest(_localizer["Se envio informacion invalida"].Value);
@@ -152,7 +152,6 @@ namespace IdentityService.Controllers
                 Email = model.Email.Trim(),
                 FirstName = model.FirstName.Trim(),
                 LastName = model.LastName.Trim(),
-                PhoneNumber = model.PhoneNumber.Trim(),
                 CellPhone = model.CellPhone.Trim(),                
                 IsEnabled = model.IsEnabled
             };
