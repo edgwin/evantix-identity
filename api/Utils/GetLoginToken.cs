@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace IdentityService.Utils
 {
-    public class GetLoginToken
+    public static class GetLoginToken
     {
         public static TokenProviderOptions GetOptions()
         {

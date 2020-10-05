@@ -40,6 +40,9 @@ namespace IdentityService.ExtensionMethods
                     result.Success = false;
                     result.Message = ex.Message;
                 }
+            }else if (addUserResult.Errors.Where(e => e.Code == "DuplicateUserName").Any())
+            {
+
             }
             result.Success = false;
             result.Message = ErrorHelper.GetErrors(addUserResult, localizer);
