@@ -11,10 +11,12 @@ namespace IdentityService.ResultTypes
         public bool Success { get; set; }
         public string Message { get; set; }
         public IdentityResult IdentityResult { get; set; }
+        public bool IsDuplicated { get; set; }
 
         public CreateUserResultType()
         {
             Message = string.Empty;
+            IsDuplicated = false;
         }
     }
 }

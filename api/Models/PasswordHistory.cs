@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace IdentityService.Models
 {
@@ -25,5 +21,6 @@ namespace IdentityService.Models
         [Column(Order = 1)]
         public string PasswordHash { get; set; }
         public DateTime CreateDate { get; set; }
+        public int AppId { get; set; }
     }
 }

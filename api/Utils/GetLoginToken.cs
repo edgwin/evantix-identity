@@ -29,7 +29,7 @@ namespace IdentityService.Utils
             };
         }
 
-        public static LoginResponseData Execute(ApplicationUser user, ApiDbContext _db, int appId)
+        public static LoginResponseData Execute(ApplicationUser user, ApiDbContext _db, int appId, string appToken)
         {
             var options = GetOptions();
             var now = DateTime.UtcNow;
@@ -37,9 +37,9 @@ namespace IdentityService.Utils
             var claims = new List<Claim>()
             {
                 new Claim(JwtRegisteredClaimNames.NameId, user.Id),
-                new Claim(JwtRegisteredClaimNames.Jti, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUniversalTime().ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Email, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Jti, appToken),
             };
 
             var userClaims = _db.UserClaims.Where(i => i.UserId == user.Id);
@@ -72,11 +72,10 @@ namespace IdentityService.Utils
                 userName = user.UserName,
                 firstName = user.FirstName,
                 lastName = user.LastName,
-                cellPhone = user.CellPhone,
                 appId = applicationInfo.Applications.AppId,
                 appHomePage = applicationInfo.Applications.HomePage,
                 appName = applicationInfo.Applications.Nombre,
-                isAdmin = claims.Any(i => i.Type == Extensions.RoleClaimType && i.Value == Extensions.AdminRole)
+                role = claims.Where(x => x.Type == Extensions.RoleClaimType).Select(i => i.Value).FirstOrDefault()
             };
             return response;
         }

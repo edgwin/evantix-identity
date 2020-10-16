@@ -135,6 +135,9 @@
   <data name="El nombre de usuario '{0}' es inválido. Solo puede contener letras y números." xml:space="preserve">
     <value>User name '{0}' is invalid, can only contain letters or digits.</value>
   </data>
+  <data name="El role de usuario no existe." xml:space="preserve">
+    <value>The user role does not exists.</value>
+  </data>
   <data name="El usuario '{0}' ya existe, por favor ingrese un nombre diferente." xml:space="preserve">
     <value>The user '{0}' is already taken, please take another one</value>
   </data>
@@ -146,6 +149,9 @@
   </data>
   <data name="El usuario ya tiene contraseña." xml:space="preserve">
     <value>User already has a password set.</value>
+  </data>
+  <data name="Error al confirmar el Email" xml:space="preserve">
+    <value>Error while trying to confirm your Email</value>
   </data>
   <data name="Ha ocurrido un error, el objeto ya ha sido modificado (Optimistic concurrency failure)." xml:space="preserve">
     <value>Optimistic concurrency failure, object has been modified.</value>
@@ -174,7 +180,7 @@
   <data name="Token Invalido" xml:space="preserve">
     <value>Invalid token.</value>
   </data>
-  <data name="Un usuario con ese nombre ya existe." xml:space="preserve">
-    <value>A user with this login already exists.</value>
+  <data name="Ya esta confirmada la cuenta." xml:space="preserve">
+    <value>The account is already confirmed</value>
   </data>
 </root>

@@ -13,19 +13,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
+using Microsoft.Owin.Security.DataProtection;
 using System;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web;
 
 namespace IdentityService.Controllers
-{    
+{
     [Produces("application/json")]
     [Route("api/Auth")]
     public class AuthenticationController : BaseController
@@ -36,14 +31,15 @@ namespace IdentityService.Controllers
         private readonly IStringLocalizer<AuthenticationController> _localizer;
         private readonly IPasswordHistory _passwordHistory;
         private readonly AccountService _accountService;
-        
+        private readonly RoleManager<IdentityRole> _roleManager;
 
         public AuthenticationController(SignInManager<ApplicationUser> signInManager,
                 UserManager<ApplicationUser> userManager,
                 ApiDbContext db,
                 IStringLocalizer<AuthenticationController> localizer,
                 IPasswordHistory passwordHistory,
-                AccountService accountService)
+                AccountService accountService,
+                RoleManager<IdentityRole> roleManager)
         {
             _signInManager = signInManager;
             _userManager = userManager;
@@ -51,6 +47,7 @@ namespace IdentityService.Controllers
             _localizer = localizer;
             _passwordHistory = passwordHistory;
             _accountService = accountService;
+            _roleManager = roleManager;
         }
 
         [HttpPost]
@@ -72,11 +69,14 @@ namespace IdentityService.Controllers
             {
                 return BadRequest(_localizer["El usuario esta deshabilitado"].Value);
             }
-            if (!user.EmailConfirmed)
+            if (!user.IsEmailConfirmed(_db, appId))
             {
                 return BadRequest(_localizer["El usuario no esta confirmado, vea su cuenta de correo para encontrar el email para verificar su cuenta"].Value);
             }
-            var response = GetLoginToken.Execute(user, _db, appId);
+
+            var appToken = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
+                           .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == appId).FirstOrDefault().Applications.AppToken;
+            var response = GetLoginToken.Execute(user, _db, appId, appToken);
             return Ok(response);
         }
 
@@ -145,42 +145,51 @@ namespace IdentityService.Controllers
 
             if (!_db.Applications.Where(c => c.AppId == model.AppId).Any())
                 return BadRequest(_localizer["La applicacion no existe"]);
-
+            if (await _roleManager.FindByNameAsync(model.Role) == null)
+            {
+                return BadRequest(_localizer["El role de usuario no existe"]);
+            }
+            //validar el modelo
             var user = new ApplicationUser()
             {
                 UserName = model.Email.Trim(),
                 Email = model.Email.Trim(),
                 FirstName = model.FirstName.Trim(),
-                LastName = model.LastName.Trim(),
-                CellPhone = model.CellPhone.Trim(),                
+                LastName = model.LastName.Trim(),            
                 IsEnabled = model.IsEnabled
             };
             
-            var addUserResult = await _userManager.CreateUserAsync(_db, user, model.Password, model.IsAdmin, model.AppId, _localizer);
+            var addUserResult = await _userManager.CreateUserAsync(_db, user, model.Password, model.Role, model.AppId, _localizer);
 
+            if (addUserResult.IsDuplicated)
+            {
+                user = await _userManager.FindByNameAsync(model.Email);
+            }
             if (addUserResult.Success)
             {
                 try
-                {                   
+                {
                     //Add password to passwordHistory
                     var passwordModel = new Models.PasswordHistory()
                     {
                         CreateDate = DateTime.Now,
                         PasswordHash = user.PasswordHash,
-                        UserId = user.Id
+                        UserId = user.Id,
+                        AppId = model.AppId
                     };
                     if (!await _passwordHistory.SavePassword(passwordModel))
                         throw new Exception(_localizer["Fallo al guardar el historial de la contraseña"].Value);
                     //Send email to confirm account
-                    var emailToken = _userManager.GenerateEmailConfirmationTokenAsync(user).Result;
+                    var emailToken = _userManager.GenerateUserTokenAsync(user, "EmailConfirm", "EmailConfirm").Result;                    
                     emailToken = HttpUtility.UrlEncode(emailToken);
                     var system = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
-                        .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.Nombre;
+                                    .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId)
+                                        .FirstOrDefault().Applications.Nombre;
 
                     var systemUrl = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                         .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.HomePage;
-
-                    var confirmationLink = $"{systemUrl}api/Auth/ConfirmEmail?userid={user.Id}&token={emailToken}";
+                    
+                    var confirmationLink = $"{systemUrl}api/Auth/ConfirmEmail?userid={user.Id}&appId={model.AppId}&token={emailToken}";
                     
                     var emailDto = new EmailDto()
                     {
@@ -206,7 +215,7 @@ namespace IdentityService.Controllers
         [HttpGet]
         [Route("ConfirmEmail")]
         [AllowAnonymous]
-        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
+        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string appId, [FromQuery] string token)
         {
             if (userId == null || token == null)
             {
@@ -217,14 +226,14 @@ namespace IdentityService.Controllers
             {
                 var user = await _userManager.Users
                     .SingleAsync(i => i.Id == userId);
-                IdentityResult result = await _userManager.ConfirmEmailAsync(user, token);
+                var result = await _userManager.EmailConfirmAsync(_db, Convert.ToInt32(appId), user, token, _localizer);
 
-                if (result.Succeeded)
+                if (result.IsValid)
                 {
-                    string url = _db.UserApplications.Where(up => up.ApplicationUser.Id == userId).Select(up => up.Applications.Url).FirstOrDefault();
+                    string url = _db.UserApplications.Where(up => up.ApplicationUser.Id == userId && up.Applications.AppId == Convert.ToInt32(appId)).Select(up => up.Applications.Url).FirstOrDefault();
                     return new OkObjectResult(new { status = "OK", callback= $"{url}"});
                 }
-                return BadRequest(ErrorHelper.GetErrors(result, _localizer));
+                return BadRequest(result.ErrorMessage);
             }
             catch(Exception ex)
             {

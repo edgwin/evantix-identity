@@ -21,11 +21,12 @@ namespace IdentityService.Models
         {            
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<PasswordHistory>()
-                .HasKey(c => new { c.UserId, c.PasswordHash });
+                .HasKey(c => new { c.UserId, c.PasswordHash, c.AppId });
             modelBuilder.Entity<Applications>()
-                .HasKey(c => new { c.AppId });
+                .HasKey(c => new { c.Id });
             modelBuilder.Entity<UsersApplications>()
                 .HasKey(c => new { c.Id });
+            modelBuilder.Entity<ApplicationUser>().Ignore(c => c.EmailConfirmed);
         }        
     }
 

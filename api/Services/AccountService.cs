@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
 using IdentityService.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace IdentityService.Services
 {
@@ -65,6 +66,7 @@ namespace IdentityService.Services
         {
             var domainUser = await _userManager.FindByEmailAsync(User.Email.Trim());
             var result = new CreateUserResultType();
+            ApplicationUser gUser = null;
             if (domainUser == null)
             {
                 var user = new ApplicationUser()
@@ -77,11 +79,11 @@ namespace IdentityService.Services
                     CellPhone = string.Empty,
                     IsEnabled = true
                 };
-
+                gUser = user;
                 //Ver la mejor manera de agregar el usuario de facebook a la base de datos
                 var password = RandomString(6);
-
-                result = await _userManager.CreateUserAsync(_db, user, password, false, AppId, localizer);
+                // TODO cuando se pruebe el external login verificar el role del usuario
+                result = await _userManager.CreateUserAsync(_db, user, password, "Comerciante", AppId, localizer);
                 if (!result.Success)
                     return new CreateFbUserResultType()
                     {
@@ -91,11 +93,13 @@ namespace IdentityService.Services
                     };
             }
             domainUser = await _userManager.FindByEmailAsync(User.Email);
+            var appToken = _db.UserApplications.Where(up => up.ApplicationUser.Id == gUser.Id)
+                           .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == AppId).FirstOrDefault().Applications.AppToken;
             return new CreateFbUserResultType()
             {
                 Ok = true,
                 Message = result.Message,
-                Value = GetLoginToken.Execute(domainUser, _db, AppId)
+                Value = GetLoginToken.Execute(domainUser, _db, AppId, appToken)
             };
         }
 

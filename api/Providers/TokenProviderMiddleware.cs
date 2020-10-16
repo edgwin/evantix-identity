@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using IdentityService.Models;
 using IdentityService.Utils;
+using System.Linq;
 
 namespace IdentityService.Providers
 {
@@ -72,7 +73,9 @@ namespace IdentityService.Providers
                     return;
                 }
                 var db = context.RequestServices.GetService<ApiDbContext>();
-                var response = GetLoginToken.Execute(user, db, appId);
+                var appToken = db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
+                           .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == appId).FirstOrDefault().Applications.AppToken;
+                var response = GetLoginToken.Execute(user, db, appId, appToken);
 
                 // Serialize and return the response
                 context.Response.ContentType = "application/json";

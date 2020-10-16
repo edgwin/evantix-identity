@@ -6,6 +6,7 @@ namespace IdentityService.Models
     {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
+        public bool EmailConfirmed { get; set; }
         public ApplicationUser ApplicationUser { get; set; }
         public Applications Applications { get; set; }
     }

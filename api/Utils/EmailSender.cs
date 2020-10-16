@@ -22,10 +22,10 @@ namespace IdentityService.Utils
                     message.BodyEncoding = System.Text.Encoding.UTF8;
                     message.IsBodyHtml = true;
 
-                    using (var client = new SmtpClient("smtp.gmail.com"))
+                    using (var client = new SmtpClient("smtp.mailtrap.io", 2525))
                     {
-                        client.Port = 587;
-                        client.Credentials = new NetworkCredential("edgwin@gmail.com", "H@d@lind@2019");
+                        //client.Port = 587;                        
+                        client.Credentials = new NetworkCredential("9e2b83a3209ff8", "5bb1a9968585bc");
                         client.EnableSsl = true;
                         await client.SendMailAsync(message);
                     }

@@ -64,6 +64,7 @@ namespace IdentityService
                 options.Password.RequireNonAlphanumeric = false;
             })
             .AddEntityFrameworkStores<ApiDbContext>()
+            .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>("EmailConfirm")
             .AddDefaultTokenProviders()
             .AddErrorDescriber<SpanishIdentityErrorDescriber>();
 
