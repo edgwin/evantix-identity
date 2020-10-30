@@ -18,22 +18,19 @@ namespace IdentityService.Models
 
         public void SeedData()
         {
-            var HomePage = string.Empty;
-            var Url = string.Empty;
-            var appToken = "C8C1A19531B77DBD6CC255F9ADB52";
-            switch (Startup.CurrentEnvironment)
-            {
-                case "Development":
-                default:
-                    {
-                        HomePage = Configuration.Config.GetSection("ApplicationNameSettings:HomeUrl").Value;
-                        Url = Configuration.Config.GetSection("ApplicationNameSettings:Url").Value;
-                        break;
-                    }
-            }
-            var rnd = new Random();
-            AddNewType(new Applications { AppId = rnd.Next(100,1000), Nombre = "IBusness", HomePage = HomePage, Url = Url, AppToken = appToken });
-            AddNewRole(new IdentityRole { Id = Guid.NewGuid().ToString(), Name = "comerciante", NormalizedName = "COMERCIANTE", ConcurrencyStamp = Guid.NewGuid().ToString() });
+            var Apps = Configuration.Config.GetSection("ApplicationNameSettings").GetChildren().ToList();
+            Apps.ForEach(app => {
+                var appToken = Configuration.Config.GetSection($"ApplicationNameSettings:{app.Key}:AppToken").Value;
+                var HomePage = Configuration.Config.GetSection($"ApplicationNameSettings:{app.Key}:HomeUrl").Value;
+                var Url = Configuration.Config.GetSection($"ApplicationNameSettings:{app.Key}:Url").Value;
+                var AppId = Convert.ToInt32(Configuration.Config.GetSection($"ApplicationNameSettings:{app.Key}:AppId").Value);
+                AddNewType(new Applications { AppId = AppId, Nombre = app.Key, HomePage = HomePage, Url = Url, AppToken = appToken });
+                //Adding Roles
+                var Roles = Configuration.Config.GetSection($"ApplicationNameSettings:{app.Key}:Roles").GetChildren().ToList();
+                Roles.ForEach(role => {
+                    AddNewRole(new IdentityRole { Id = Guid.NewGuid().ToString(), Name = role.Key.ToLower(), NormalizedName = role.Key.ToUpper(), ConcurrencyStamp = Guid.NewGuid().ToString() });
+                });                
+            });            
             _context.SaveChanges();
         }
 

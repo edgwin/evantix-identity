@@ -144,7 +144,7 @@ namespace IdentityService.Controllers
 
             if (!_db.Applications.Where(c => c.AppId == model.AppId).Any())
                 return BadRequest(_localizer["La applicacion no existe"]);
-            if (await _roleManager.FindByNameAsync(model.Role) == null)
+            if (await _roleManager.FindByNameAsync(model.Role.ToString()) == null)
             {
                 return BadRequest(_localizer["El role de usuario no existe"]);
             }
@@ -158,7 +158,7 @@ namespace IdentityService.Controllers
                 IsEnabled = model.IsEnabled
             };
             
-            var addUserResult = await _userManager.CreateUserAsync(_db, user, model.Password, model.Role, model.AppId, _localizer);
+            var addUserResult = await _userManager.CreateUserAsync(_db, user, model.Password, model.Role.ToString(), model.AppId, _localizer);
 
             if (addUserResult.IsDuplicated)
             {
@@ -188,7 +188,7 @@ namespace IdentityService.Controllers
                     var systemUrl = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                         .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.HomePage;
                     
-                    var confirmationLink = $"{systemUrl}api/Auth/ConfirmEmail?userid={user.Id}&appId={model.AppId}&token={emailToken}";
+                    var confirmationLink = $"{systemUrl}{model.ConfirmUrl}?userid={user.Id}&token={emailToken}";
                     
                     var emailDto = new EmailDto()
                     {

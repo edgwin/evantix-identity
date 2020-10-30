@@ -1,4 +1,5 @@
-﻿using System;
+﻿using IdentityService.Enums;
+using System;
 
 namespace IdentityService.Models
 {
@@ -10,6 +11,7 @@ namespace IdentityService.Models
         public int AppId { get; set; }        
         public bool IsEnabled { get; set; }
         public string Password { get; set; }
-        public string Role { get; set; }
+        public RolesEnum Role { get; set; }
+        public string ConfirmUrl { get; set; }
     }
 }
