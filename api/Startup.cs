@@ -1,15 +1,17 @@
 ﻿using IdentityService.Models;
 using IdentityService.Providers;
+using IdentityService.Services;
 using IdentityService.Utils.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -17,8 +19,6 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using IdentityService.Services;
-using Microsoft.AspNetCore.Authentication.OAuth;
 
 namespace IdentityService
 {
@@ -41,7 +41,7 @@ namespace IdentityService
                 {
                     builder.AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowAnyOrigin()
+                    .SetIsOriginAllowed(origin => true)
                     .AllowCredentials();
                 });
             });
@@ -53,7 +53,7 @@ namespace IdentityService
                 o.ResourcesPath = "Resources";
             });
 
-            services.AddMvc()
+            services.AddMvc(option => option.EnableEndpointRouting = false)
                 .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
                 .AddDataAnnotationsLocalization();
 
@@ -61,7 +61,8 @@ namespace IdentityService
 
             services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
-                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredLength = 8;
             })
             .AddEntityFrameworkStores<ApiDbContext>()
             .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>("EmailConfirm")
@@ -125,10 +126,15 @@ namespace IdentityService
                     options.ClientId = "78p1nrxr7qwobe";
                     options.ClientSecret = "y461OtLEqUHnrvbT";                                  
                 });
-            //.AddLinkedIn(options => {
-            //    options.ClientId = "78p1nrxr7qwobe";
-            //    options.ClientSecret = "y461OtLEqUHnrvbT";
-            //});
+            
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+                {
+                    Title = "Identity API",
+                    Version = "v1"
+                });
+            });
 
             services.AddScoped<IPasswordHistory, Utils.PasswordHistory>();
             services.AddScoped<AccountService, AccountService>();
@@ -139,15 +145,14 @@ namespace IdentityService
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         // NOTE: DI is done here
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
             app.UseCors("CorsPolicy");
 
-            loggerFactory.AddConsole(Configuration.GetSection("Logging"));
-            loggerFactory.AddDebug();
+            //loggerFactory.AddConsole(Configuration.GetSection("Logging"));
+            //loggerFactory.AddDebug();
 
             CurrentEnvironment = env.EnvironmentName;
-
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -170,6 +175,12 @@ namespace IdentityService
             app.UseStaticFiles();            
             app.UseMiddleware<TokenProviderMiddleware>();
             app.UseAuthentication();
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity API");
+                c.RoutePrefix = "help"; // Set Swagger UI at the app's root (localhost:5000/)
+            });
             app.UseMvc(routes =>
             {
                 routes.MapRoute("default", "{controller=Home}/{action=Index}/{id?}");

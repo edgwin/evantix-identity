@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <UserSecretsId>d5866114-efe3-4873-90e5-bec8e5e0ca32</UserSecretsId>
   </PropertyGroup>
 
@@ -9,14 +9,23 @@
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
-  <ItemGroup>        
-    <PackageReference Include="AspNet.Security.OAuth.LinkedIn" Version="2.1.0" />        
-    <PackageReference Include="Microsoft.AspNetCore.All" />        
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="2.2.0" />        
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="2.2.2" />        
-    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.2.3" />
+  <ItemGroup>
+	<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+	<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="AspNet.Security.OAuth.LinkedIn" Version="8.1.0" />              
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="8.0.8" />        
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.8" />        
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />        
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.1" />
   </ItemGroup>
 
+	<ItemGroup>
+		<!-- Aquí agregas la referencia al framework ASP.NET Core -->
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+	
   <ItemGroup>
     <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.1.0-preview1-final" />
   </ItemGroup>

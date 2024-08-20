@@ -52,30 +52,29 @@ namespace IdentityService.Controllers
         [HttpPost]
         [Route("Authentication")]
         [AllowAnonymous]
-        public async Task<IActionResult> Authenticate(string username, string password, int appId)
+        public async Task<IActionResult> Authenticate([FromBody] AuthenticateDto request)
         {
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
                 return BadRequest(_localizer["El usuario y password no deben estar vacios"].Value);
 
-            var result = await _signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: false);
+            var result = await _signInManager.PasswordSignInAsync(request.UserName, request.Password, false, lockoutOnFailure: false);
             if (!result.Succeeded)
             {
                 return BadRequest(_localizer["Usuario o Password Invalidos"].Value);
             }
-            var user = await _userManager.Users
-                .SingleAsync(i => i.UserName == username);
+            var user = _userManager.Users.FirstOrDefault(i => i.UserName == request.UserName);
             if (!user.IsEnabled)
             {
                 return BadRequest(_localizer["El usuario esta deshabilitado"].Value);
             }
-            if (!user.IsEmailConfirmed(_db, appId))
+            if (!user.IsEmailConfirmed(_db, request.AppId))
             {
                 return BadRequest(_localizer["El usuario no esta confirmado, vea su cuenta de correo para encontrar el email para verificar su cuenta"].Value);
             }
 
             var appToken = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
-                           .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == appId).FirstOrDefault().Applications.AppToken;
-            var response = GetLoginToken.Execute(user, _db, appId, appToken);
+                           .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == request.AppId).FirstOrDefault().Applications.AppToken;
+            var response = GetLoginToken.Execute(user, _db, request.AppId, appToken);
             return Ok(response);
         }
 
@@ -192,7 +191,7 @@ namespace IdentityService.Controllers
                     
                     var emailDto = new EmailDto()
                     {
-                        Body = string.Format(_localizer["Hola {0} {1} <br />Gracias por tu interes en {2}.<br />Tu cuenta esta casi lista para ser usada. Solo un paso mas, por favor da click en la liga de abajo para activar tu cuenta.<br /><br />{3} <br /><br />Si la liga no funciona, copia y pegala en tu navegador de internet.<br/>El equipo de {2}."].Value, model.FirstName, model.LastName, system, confirmationLink),
+                        Body = string.Format(_localizer["Hola {0} {1} <br />Gracias por tu interes en {2}.<br />Tu cuenta esta casi lista para ser usada. Solo un paso mas, por favor da click en la liga de abajo para activar tu cuenta.<br /><br /> <a href=\"{3}\">{3}</a> <br /><br />Si la liga no funciona, copia y pegala en tu navegador de internet.<br/>El equipo de {2}."].Value, model.FirstName, model.LastName, system, confirmationLink),
                         FromAddress = Configuration.Config.GetSection("EmailSettings:FromEmail").Value,
                         FromName = Configuration.Config.GetSection("EmailSettings:FromName").Value,
                         ToAddress = model.Email,
@@ -223,8 +222,7 @@ namespace IdentityService.Controllers
 
             try
             {
-                var user = await _userManager.Users
-                    .SingleAsync(i => i.Id == userId);
+                var user = _userManager.Users.FirstOrDefault(i => i.Id == userId);
                 var result = await _userManager.EmailConfirmAsync(_db, Convert.ToInt32(appId), user, token, _localizer);
 
                 if (result.IsValid)

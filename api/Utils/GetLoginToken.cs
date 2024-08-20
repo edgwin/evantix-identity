@@ -42,16 +42,16 @@ namespace IdentityService.Utils
                 new Claim(JwtRegisteredClaimNames.Jti, appToken),
             };
 
-            var userClaims = _db.UserClaims.Where(i => i.UserId == user.Id);
+            var userClaims = _db.UserClaims.Where(i => i.UserId == user.Id).ToList();
             foreach (var userClaim in userClaims)
             {
                 claims.Add(new Claim(userClaim.ClaimType, userClaim.ClaimValue));
             }
-            var userRoles = _db.UserRoles.Where(i => i.UserId == user.Id);
+            var userRoles = _db.UserRoles.Where(i => i.UserId == user.Id).ToList();
             foreach(var userRole in userRoles)
             {
-                var role = _db.Roles.Single(i => i.Id == userRole.RoleId);
-                claims.Add(new Claim(Extensions.RoleClaimType, role.Name));
+                var role = _db.Roles.Where(i => i.Id == userRole.RoleId).FirstOrDefault();
+                claims.Add(new Claim(Extensions.RoleClaimType, role.Name));              
             }
             
             var jwt = new JwtSecurityToken(

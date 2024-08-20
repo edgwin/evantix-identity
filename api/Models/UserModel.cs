@@ -1,5 +1,6 @@
 ﻿using IdentityService.Enums;
 using System;
+using System.Text.Json.Serialization;
 
 namespace IdentityService.Models
 {
@@ -11,6 +12,7 @@ namespace IdentityService.Models
         public int AppId { get; set; }        
         public bool IsEnabled { get; set; }
         public string Password { get; set; }
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public RolesEnum Role { get; set; }
         public string ConfirmUrl { get; set; }
     }
