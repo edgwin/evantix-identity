@@ -1,4 +1,5 @@
 ﻿
+using IdentityService.ExternalProvider;
 using IdentityService.Models;
 using IdentityService.Providers;
 using Microsoft.EntityFrameworkCore;
@@ -75,7 +76,9 @@ namespace IdentityService.Utils
                 appId = applicationInfo.Applications.AppId,
                 appHomePage = applicationInfo.Applications.HomePage,
                 appName = applicationInfo.Applications.Nombre,
-                role = claims.Where(x => x.Type == Extensions.RoleClaimType).Select(i => i.Value).FirstOrDefault()
+                role = claims.Where(x => x.Type == Extensions.RoleClaimType).Select(i => i.Value).FirstOrDefault(),
+                email = user.Email,
+                picture = user.Picture
             };
             return response;
         }

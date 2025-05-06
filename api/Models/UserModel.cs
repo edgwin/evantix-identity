@@ -15,5 +15,13 @@ namespace IdentityService.Models
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public RolesEnum Role { get; set; }
         public string ConfirmUrl { get; set; }
+        public bool IsSocialUser { get; set; } = false;
+        public string SocialPicture { get; set; } = string.Empty;
+        public string Picture { get; set; }
+
+        public UserModel()
+        {
+            Picture = "images/User.png";
+        }
     }
 }

@@ -1,14 +1,11 @@
 ﻿using IdentityService.Dtos;
 using IdentityService.Enums;
-using IdentityService.ExtensionMethods;
-using IdentityService.ExternalProvider;
 using IdentityService.Models;
+using IdentityService.ResultTypes;
 using IdentityService.Services;
 using IdentityService.Utils;
 using IdentityService.Utils.Interfaces;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +13,6 @@ using Microsoft.Extensions.Localization;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace IdentityService.Controllers
 {
@@ -28,8 +24,7 @@ namespace IdentityService.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApiDbContext _db;
         private readonly IStringLocalizer<AuthenticationController> _localizer;
-        private readonly IPasswordHistory _passwordHistory;
-        private readonly AccountService _accountService;
+        private readonly IPasswordHistory _passwordHistory;        
         private readonly RoleManager<IdentityRole> _roleManager;
 
         public AuthenticationController(SignInManager<ApplicationUser> signInManager,
@@ -37,7 +32,6 @@ namespace IdentityService.Controllers
                 ApiDbContext db,
                 IStringLocalizer<AuthenticationController> localizer,
                 IPasswordHistory passwordHistory,
-                AccountService accountService,
                 RoleManager<IdentityRole> roleManager)
         {
             _signInManager = signInManager;
@@ -45,7 +39,6 @@ namespace IdentityService.Controllers
             _db = db;
             _localizer = localizer;
             _passwordHistory = passwordHistory;
-            _accountService = accountService;
             _roleManager = roleManager;
         }
 
@@ -75,7 +68,25 @@ namespace IdentityService.Controllers
             var appToken = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                            .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == request.AppId).FirstOrDefault().Applications.AppToken;
             var response = GetLoginToken.Execute(user, _db, request.AppId, appToken);
-            return Ok(response);
+            var retVal = new UserResultType()
+            {
+                access_token = response.access_token,
+                appId = response.appId,
+                appHomePage = response.appHomePage,
+                appName = response.appName,
+                expires_in = response.expires_in,
+                refresh_token = response.refresh_token,
+                User = new UserResult()
+                {
+                    firstName = response.firstName,
+                    lastName = response.lastName,
+                    role = response.role,
+                    userName = response.userName,
+                    email = response.email,
+                    picture = response.picture
+                }
+            };
+            return Ok(retVal);
         }
 
         [HttpGet]
@@ -84,177 +95,6 @@ namespace IdentityService.Controllers
         public IActionResult LinkedInLoginAsync()
         {
             return Redirect("https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=78p1nrxr7qwobe&redirect_uri=http://localhost:53055/api/Auth/LnkInAuthentication&state=1&scope=r_emailaddress%20r_liteprofile");
-        }
-
-        [HttpGet]
-        [AllowAnonymous]
-        [Route("FacebookLogin")]
-        public async Task FacebookLoginAsync()
-        {
-            await HttpContext.ChallengeAsync("Facebook", new AuthenticationProperties { RedirectUri = "/api/Auth/FbAuthentication" });
-        }
-
-        [HttpGet]
-        [Route("FbAuthentication")]
-        [AllowAnonymous]
-        public async Task<IActionResult> FacebookLoginAuthenticationAsync([FromBody] ExternalProviderLoginResource resource)
-        {
-            if (string.IsNullOrEmpty(resource.Token))
-                return BadRequest(_localizer["El token debe ser enviado"].Value);
-
-            if (resource.AppId == 0)
-                return BadRequest(_localizer["AppId no fue enviado"].Value);
-
-            var authorizationTokens = await _accountService.ExternalLoginAsync(SocialMediaEnum.Facebook, resource, _db, _localizer);
-            if (authorizationTokens.Ok)
-                return Ok(authorizationTokens.Value);
-            return BadRequest(authorizationTokens.Message);
-        }
-
-        [HttpGet]
-        [Route("LnkInAuthentication")]
-        public async Task<IActionResult> LinkedInLoginAsync(string code, string state, string error, string error_description)
-        {
-            if (string.IsNullOrEmpty(code))
-            {
-                return BadRequest(_localizer["El token debe ser enviado"].Value);
-            }
-
-            if (Int32.TryParse(state, out int AppId))
-            {
-                var authorizationTokens = await _accountService.ExternalLoginAsync(SocialMediaEnum.LinkedIn, code, _db, _localizer, AppId);
-                if (authorizationTokens.Ok)
-                    return Ok(authorizationTokens.Value);
-                return BadRequest(authorizationTokens.Message);
-            }
-            return BadRequest(_localizer["El identificador de Aplicacion es invalido"].Value);            
-        }
-
-        [HttpPost]
-        [Route("Create")]
-        [AllowAnonymous]
-        public async Task<IActionResult> CreateUser([FromBody]UserModel model)
-        {
-            if (model == null)
-                return BadRequest(_localizer["Se envio informacion invalida"].Value);
-
-            if (model.Password == null)
-                return BadRequest( _localizer["Password requerido"].Value);
-
-            if (!_db.Applications.Where(c => c.AppId == model.AppId).Any())
-                return BadRequest(_localizer["La applicacion no existe"]);
-            if (await _roleManager.FindByNameAsync(model.Role.ToString()) == null)
-            {
-                return BadRequest(_localizer["El role de usuario no existe"]);
-            }
-            //validar el modelo
-            var user = new ApplicationUser()
-            {
-                UserName = model.Email.Trim(),
-                Email = model.Email.Trim(),
-                FirstName = model.FirstName.Trim(),
-                LastName = model.LastName.Trim(),            
-                IsEnabled = model.IsEnabled
-            };
-            
-            var addUserResult = await _userManager.CreateUserAsync(_db, user, model.Password, model.Role.ToString(), model.AppId, _localizer);
-
-            if (addUserResult.IsDuplicated)
-            {
-                user = await _userManager.FindByNameAsync(model.Email);
-            }
-            if (addUserResult.Success)
-            {
-                try
-                {
-                    //Add password to passwordHistory
-                    var passwordModel = new Models.PasswordHistory()
-                    {
-                        CreateDate = DateTime.Now,
-                        PasswordHash = user.PasswordHash,
-                        UserId = user.Id,
-                        AppId = model.AppId
-                    };
-                    if (!await _passwordHistory.SavePassword(passwordModel))
-                        throw new Exception(_localizer["Fallo al guardar el historial de la contraseña"].Value);
-                    //Send email to confirm account
-                    var emailToken = _userManager.GenerateUserTokenAsync(user, "EmailConfirm", "EmailConfirm").Result;                    
-                    emailToken = HttpUtility.UrlEncode(emailToken);
-                    var system = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
-                                    .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId)
-                                        .FirstOrDefault().Applications.Nombre;
-
-                    var systemUrl = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
-                        .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.HomePage;
-                    
-                    var confirmationLink = $"{systemUrl}{model.ConfirmUrl}?userid={user.Id}&token={emailToken}";
-                    
-                    var emailDto = new EmailDto()
-                    {
-                        Body = string.Format(_localizer["Hola {0} {1} <br />Gracias por tu interes en {2}.<br />Tu cuenta esta casi lista para ser usada. Solo un paso mas, por favor da click en la liga de abajo para activar tu cuenta.<br /><br /> <a href=\"{3}\">{3}</a> <br /><br />Si la liga no funciona, copia y pegala en tu navegador de internet.<br/>El equipo de {2}."].Value, model.FirstName, model.LastName, system, confirmationLink),
-                        FromAddress = Configuration.Config.GetSection("EmailSettings:FromEmail").Value,
-                        FromName = Configuration.Config.GetSection("EmailSettings:FromName").Value,
-                        ToAddress = model.Email,
-                        ToName = $"{model.FirstName} {model.LastName}",
-                        Subject = string.Format(_localizer["Por favor, confirme su cuenta de {0}"].Value, system)
-                    };
-                    await EmailSender.SendAsync(emailDto);
-                    return Ok();
-                }
-                catch (Exception ex)
-                {
-                    return BadRequest(ex.Message);
-                }
-            }            
-
-            return BadRequest(ErrorHelper.GetErrors(addUserResult.IdentityResult, _localizer));
-        }
-
-        [HttpGet]
-        [Route("ConfirmEmail")]
-        [AllowAnonymous]
-        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string appId, [FromQuery] string token)
-        {
-            if (userId == null || token == null)
-            {
-                return BadRequest();
-            }
-
-            try
-            {
-                var user = _userManager.Users.FirstOrDefault(i => i.Id == userId);
-                var result = await _userManager.EmailConfirmAsync(_db, Convert.ToInt32(appId), user, token, _localizer);
-
-                if (result.IsValid)
-                {
-                    string url = _db.UserApplications.Where(up => up.ApplicationUser.Id == userId && up.Applications.AppId == Convert.ToInt32(appId)).Select(up => up.Applications.Url).FirstOrDefault();
-                    return new OkObjectResult(new { status = "OK", callback= $"{url}"});
-                }
-                return BadRequest(result.ErrorMessage);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
-        }
-
-        [HttpPost]
-        [Route("DisableUser")]
-        [Authorize(Roles = "admin")]
-        public async Task<IActionResult> DisableUser(bool disable)
-        {
-            try
-            {
-                var user = UserUtils.GetUser(HttpContext, _userManager);
-                user.IsEnabled = !disable;
-                var result = await _userManager.UpdateAsync(user);
-                if (result.Succeeded)
-                    return Ok();
-                return BadRequest(ErrorHelper.GetErrors(result, _localizer));                
-            }catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
-        }        
+        }     
     }
 }

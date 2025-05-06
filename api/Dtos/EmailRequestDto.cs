@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 namespace IdentityService.Dtos
 {
     public class EmailRequestDto
-    {
-        public string email { get; set; }
+    {   
+        public string Email { get; set; }
+        public int AppId { get; set; }
     }
 }
