@@ -71,6 +71,7 @@ namespace IdentityService
 
             var efConnection = Configuration["DefaultConnection"];
             services.AddDbContext<ApiDbContext>(options => options.UseSqlServer(efConnection));
+            services.AddHttpClient();
 
             // return 401 instead of redirect to login
             services.ConfigureApplicationCookie(options => {

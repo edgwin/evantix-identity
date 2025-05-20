@@ -20,5 +20,6 @@
         public string role { get; set; }
         public string email { get; set; }
         public string picture { get; set; }
+        public bool isSocial { get; set; } = false;
     }
 }

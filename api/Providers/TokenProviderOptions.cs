@@ -6,6 +6,12 @@ namespace IdentityService.Providers
     public class TokenProviderOptions
     {
         /// <summary>
+        /// Secret Key
+        /// </summary>
+        /// <remarks>The default path is <c>/token</c>.</remarks>
+        public string SecretKey { get; set; }
+
+        /// <summary>
         /// The relative request path to listen on.
         /// </summary>
         /// <remarks>The default path is <c>/token</c>.</remarks>

@@ -100,7 +100,7 @@ namespace IdentityService.Services
                 //Ver la mejor manera de agregar el usuario de facebook a la base de datos
                 var password = HashPassword(GenerateRandomString(32));
                 // TODO cuando se pruebe el external login verificar el role del usuario
-                result = await _userManager.CreateUserAsync(_db, user, password, "Comerciante", AppId, localizer);
+                result = await _userManager.CreateUserAsync(_db, user, password, "User", AppId, localizer);
                 if (!result.Success)
                     return new CreateSocialUserResultType()
                     {

@@ -1,6 +1,4 @@
-﻿
-using IdentityService.ExternalProvider;
-using IdentityService.Models;
+﻿using IdentityService.Models;
 using IdentityService.Providers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -10,7 +8,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace IdentityService.Utils
 {
@@ -18,15 +15,18 @@ namespace IdentityService.Utils
     {
         public static TokenProviderOptions GetOptions()
         {
-            var signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(Configuration.Config.GetSection("TokenAuthentication:SecretKey").Value));
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration.Config.GetSection("TokenAuthentication:SecretKey").Value));
+            var signingKey = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);            
 
             return new TokenProviderOptions
             {
+                SecretKey = Configuration.Config.GetSection("TokenAuthentication:SecretKey").Value,
                 Path = Configuration.Config.GetSection("TokenAuthentication:TokenPath").Value,
                 Audience = Configuration.Config.GetSection("TokenAuthentication:Audience").Value,
                 Issuer = Configuration.Config.GetSection("TokenAuthentication:Issuer").Value,
                 Expiration = TimeSpan.FromMinutes(Convert.ToInt32(Configuration.Config.GetSection("TokenAuthentication:ExpirationMinutes").Value)),
-                SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256)
+                SigningCredentials = signingKey
             };
         }
 
@@ -54,7 +54,7 @@ namespace IdentityService.Utils
                 var role = _db.Roles.Where(i => i.Id == userRole.RoleId).FirstOrDefault();
                 claims.Add(new Claim(Extensions.RoleClaimType, role.Name));              
             }
-            
+
             var jwt = new JwtSecurityToken(
                 issuer: options.Issuer,
                 audience: options.Audience,
