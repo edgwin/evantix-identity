@@ -458,7 +458,8 @@ namespace IdentityService.Controllers
                         role = authorizationTokens.Value.role,
                         userName = authorizationTokens.Value.userName,
                         email = authorizationTokens.Value.email,
-                        picture = authorizationTokens.Value.picture
+                        picture = authorizationTokens.Value.picture,
+                        isSocial = true
                     }
                 };
                 return Ok(retVal);

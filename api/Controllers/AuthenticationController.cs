@@ -78,6 +78,7 @@ namespace IdentityService.Controllers
                 refresh_token = response.refresh_token,
                 User = new UserResult()
                 {
+                    UserId = user.Id,
                     firstName = response.firstName,
                     lastName = response.lastName,
                     role = response.role,
