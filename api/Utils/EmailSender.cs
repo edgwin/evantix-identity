@@ -22,11 +22,16 @@ namespace IdentityService.Utils
                     message.BodyEncoding = System.Text.Encoding.UTF8;
                     message.IsBodyHtml = true;
 
-                    using (var client = new SmtpClient("smtp.mailtrap.io", 2525))
+                    var smtpHost = Configuration.Config.GetSection("SmtpSettings:Host").Value;
+                    var smtpPort = int.Parse(Configuration.Config.GetSection("SmtpSettings:Port").Value);
+                    var smtpUser = Configuration.Config.GetSection("SmtpSettings:Username").Value;
+                    var smtpPass = Configuration.Config.GetSection("SmtpSettings:Password").Value;
+                    var enableSsl = bool.Parse(Configuration.Config.GetSection("SmtpSettings:EnableSsl").Value ?? "true");
+
+                    using (var client = new SmtpClient(smtpHost, smtpPort))
                     {
-                        //client.Port = 587;                        
-                        client.Credentials = new NetworkCredential("9e2b83a3209ff8", "5bb1a9968585bc");
-                        client.EnableSsl = true;
+                        client.Credentials = new NetworkCredential(smtpUser, smtpPass);
+                        client.EnableSsl = enableSsl;
                         await client.SendMailAsync(message);
                     }
                 }

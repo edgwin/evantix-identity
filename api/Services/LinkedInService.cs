@@ -1,5 +1,6 @@
 ﻿using IdentityService.ExternalProvider;
 using IdentityService.Models;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
 using System.Net.Http;
@@ -11,15 +12,20 @@ namespace IdentityService.Services
     public class LinkedInService
     {
         private readonly HttpClient _httpClient;
-        public LinkedInService()
+        private readonly IConfiguration _configuration;
+        public LinkedInService(IConfiguration configuration)
         {
-            _httpClient = new HttpClient();            
+            _httpClient = new HttpClient();
+            _configuration = configuration;
         }
 
         public async Task<string> GetTokenAsync(string code)
         {
-            _httpClient.BaseAddress = new Uri("https://www.linkedin.com/");
-            var requestUrl = $"oauth/v2/accessToken?grant_type=authorization_code&code={code}&redirect_uri=http://localhost:53055/api/Auth/LnkInAuthentication&client_id=78p1nrxr7qwobe&client_secret=y461OtLEqUHnrvbT";
+            _httpClient.BaseAddress = new Uri(_configuration["LinkedInAuth:TokenUrl"]);
+            var redirectUri = _configuration["LinkedInAuth:RedirectUri"];
+            var clientId = _configuration["LinkedInAuth:ClientId"];
+            var clientSecret = _configuration["LinkedInAuth:ClientSecret"];
+            var requestUrl = $"oauth/v2/accessToken?grant_type=authorization_code&code={code}&redirect_uri={redirectUri}&client_id={clientId}&client_secret={clientSecret}";
             var response = await _httpClient.GetAsync(requestUrl);
             var token = JsonConvert.DeserializeObject<LinkedInTokenResponse>(await response.Content.ReadAsStringAsync());
             return token.Access_token;

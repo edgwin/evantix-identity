@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Localization;
 using System;
 using System.Linq;
@@ -26,13 +27,15 @@ namespace IdentityService.Controllers
         private readonly IStringLocalizer<AuthenticationController> _localizer;
         private readonly IPasswordHistory _passwordHistory;        
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IConfiguration _configuration;
 
         public AuthenticationController(SignInManager<ApplicationUser> signInManager,
                 UserManager<ApplicationUser> userManager,
                 ApiDbContext db,
                 IStringLocalizer<AuthenticationController> localizer,
                 IPasswordHistory passwordHistory,
-                RoleManager<IdentityRole> roleManager)
+                RoleManager<IdentityRole> roleManager,
+                IConfiguration configuration)
         {
             _signInManager = signInManager;
             _userManager = userManager;
@@ -40,6 +43,7 @@ namespace IdentityService.Controllers
             _localizer = localizer;
             _passwordHistory = passwordHistory;
             _roleManager = roleManager;
+            _configuration = configuration;
         }
 
         [HttpPost]
@@ -95,7 +99,10 @@ namespace IdentityService.Controllers
         [Route("LinkedInLogin")]
         public IActionResult LinkedInLoginAsync()
         {
-            return Redirect("https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=78p1nrxr7qwobe&redirect_uri=http://localhost:53055/api/Auth/LnkInAuthentication&state=1&scope=r_emailaddress%20r_liteprofile");
+            var authUrl = _configuration["LinkedInAuth:AuthorizationUrl"];
+            var clientId = _configuration["LinkedInAuth:ClientId"];
+            var redirectUri = Uri.EscapeDataString(_configuration["LinkedInAuth:RedirectUri"]);
+            return Redirect($"{authUrl}?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&state=1&scope=r_emailaddress%20r_liteprofile");
         }     
     }
 }

@@ -120,12 +120,12 @@ namespace IdentityService
                 })
                 .AddFacebook(options =>
                 {
-                    options.AppId = "353994368862998";
-                    options.AppSecret = "897b7284048a0bbe15c7e6553d0acc82";
+                    options.AppId = Configuration["FacebookAuth:AppId"];
+                    options.AppSecret = Configuration["FacebookAuth:AppSecret"];
                 })
                 .AddLinkedIn(options => {
-                    options.ClientId = "78p1nrxr7qwobe";
-                    options.ClientSecret = "y461OtLEqUHnrvbT";                                  
+                    options.ClientId = Configuration["LinkedInAuth:ClientId"];
+                    options.ClientSecret = Configuration["LinkedInAuth:ClientSecret"];                                  
                 });
             
             services.AddSwaggerGen(c =>
