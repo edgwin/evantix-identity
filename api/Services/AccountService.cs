@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
@@ -98,7 +99,7 @@ namespace IdentityService.Services
                     Picture = User.Picture
                 };
                 //Ver la mejor manera de agregar el usuario de facebook a la base de datos
-                var password = HashPassword(GenerateRandomString(32));
+                var password = GenerateSecurePassword(16);
                 // TODO cuando se pruebe el external login verificar el role del usuario
                 result = await _userManager.CreateUserAsync(_db, user, password, "User", AppId, localizer);
                 if (!result.Success)
@@ -121,29 +122,32 @@ namespace IdentityService.Services
             };
         }
 
-        private static string HashPassword(string password)
+        private static string GenerateSecurePassword(int length)
         {
-            // Salt = aleatorio para que el mismo password no genere el mismo hash
-            byte[] salt = RandomNumberGenerator.GetBytes(16); // 16 bytes = 128 bits
-            var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
+            const string upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const string lower = "abcdefghijklmnopqrstuvwxyz";
+            const string digits = "0123456789";
+            const string special = "!@#$%^&*()_+-=";
+            const string all = upper + lower + digits + special;
 
-            byte[] hash = pbkdf2.GetBytes(32); // 32 bytes = 256 bits
-            byte[] hashBytes = new byte[48]; // 16 + 32
+            var random = new Random();
+            // Garantizar al menos 1 de cada tipo
+            var chars = new List<char>
+            {
+                upper[random.Next(upper.Length)],
+                lower[random.Next(lower.Length)],
+                digits[random.Next(digits.Length)],
+                special[random.Next(special.Length)]
+            };
 
-            // Juntamos el salt + hash en un solo array para guardarlo
-            Array.Copy(salt, 0, hashBytes, 0, 16);
-            Array.Copy(hash, 0, hashBytes, 16, 32);
+            // Rellenar el resto con caracteres aleatorios de todos los tipos
+            for (int i = chars.Count; i < length; i++)
+            {
+                chars.Add(all[random.Next(all.Length)]);
+            }
 
-            // Lo convertimos en string (Base64) para guardarlo en base de datos
-            return Convert.ToBase64String(hashBytes);
-        }
-
-        private static string GenerateRandomString(int length)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            Random random = new Random();
-            return new string(Enumerable.Repeat(chars, length)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            // Mezclar para que los primeros 4 no siempre sean upper, lower, digit, special
+            return new string(chars.OrderBy(_ => random.Next()).ToArray());
         }
     }
 }

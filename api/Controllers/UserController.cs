@@ -125,7 +125,7 @@ namespace IdentityService.Controllers
                     var appToken = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                            .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == model.AppId).FirstOrDefault().Applications.AppToken;
                     var accessToken = GetLoginToken.Execute(user, _db, model.AppId, appToken).access_token;
-                    var response = await CreateUserInEvantix(user, accessToken);                    
+                    var response = await CreateUserInEvantix(user, accessToken, model.Role.ToString());                    
 
                     if (!model.IsSocialUser)
                     {
@@ -201,7 +201,7 @@ namespace IdentityService.Controllers
             }
         }
 
-        private async Task<IActionResult> CreateUserInEvantix(ApplicationUser user, string accessToken)
+        private async Task<IActionResult> CreateUserInEvantix(ApplicationUser user, string accessToken, string role)
         {
             var client = _httpClientFactory.CreateClient();
             var evantixUser = new EvantixUserModel()
@@ -209,7 +209,8 @@ namespace IdentityService.Controllers
                 Id = user.Id,
                 Apellidos = user.LastName,
                 Nombres = user.FirstName,
-                Email = user.Email
+                Email = user.Email,
+                Role = role
             };
 
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -405,6 +406,9 @@ namespace IdentityService.Controllers
             var authorizationTokens = await _accountService.ExternalLoginAsync(SocialMediaEnum.Google, resource, _db, _localizer);
             if (authorizationTokens.Ok)
             {
+                // Buscar usuario para obtener el Id
+                var domainUser = await _userManager.FindByEmailAsync(authorizationTokens.Value.email);
+
                 var retVal = new UserResultType()
                 {
                     access_token = authorizationTokens.Value.access_token,
@@ -415,6 +419,7 @@ namespace IdentityService.Controllers
                     refresh_token = authorizationTokens.Value.refresh_token,
                     User = new UserResult()
                     {
+                        userId = domainUser?.Id,
                         firstName = authorizationTokens.Value.firstName,
                         lastName = authorizationTokens.Value.lastName,
                         role = authorizationTokens.Value.role,
@@ -424,6 +429,17 @@ namespace IdentityService.Controllers
                         isSocial = true
                     }
                 };
+
+                // Crear usuario en Evantix API
+                try
+                {
+                    if (domainUser != null)
+                    {
+                        await CreateUserInEvantix(domainUser, authorizationTokens.Value.access_token, authorizationTokens.Value.role ?? "User");
+                    }
+                }
+                catch (Exception) { /* No bloquear login si falla el registro en Evantix */ }
+
                 return Ok(retVal);
             }
             return BadRequest(authorizationTokens.Message);
@@ -443,6 +459,9 @@ namespace IdentityService.Controllers
             var authorizationTokens = await _accountService.ExternalLoginAsync(SocialMediaEnum.Facebook, resource, _db, _localizer);            
             if (authorizationTokens.Ok)
             {
+                // Buscar usuario para obtener el Id
+                var domainUser = await _userManager.FindByEmailAsync(authorizationTokens.Value.email);
+
                 var retVal = new UserResultType()
                 {
                     access_token = authorizationTokens.Value.access_token,
@@ -453,6 +472,7 @@ namespace IdentityService.Controllers
                     refresh_token = authorizationTokens.Value.refresh_token,
                     User = new UserResult()
                     {
+                        userId = domainUser?.Id,
                         firstName = authorizationTokens.Value.firstName,
                         lastName = authorizationTokens.Value.lastName,
                         role = authorizationTokens.Value.role,
@@ -462,6 +482,17 @@ namespace IdentityService.Controllers
                         isSocial = true
                     }
                 };
+
+                // Crear usuario en Evantix API
+                try
+                {
+                    if (domainUser != null)
+                    {
+                        await CreateUserInEvantix(domainUser, authorizationTokens.Value.access_token, authorizationTokens.Value.role ?? "User");
+                    }
+                }
+                catch (Exception) { /* No bloquear login si falla el registro en Evantix */ }
+
                 return Ok(retVal);
             }
             return BadRequest(authorizationTokens.Message);
