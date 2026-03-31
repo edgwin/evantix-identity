@@ -1,4 +1,5 @@
-﻿using Azure.Core;
+using Azure.Core;
+using Microsoft.Extensions.Logging;
 using IdentityService.Dtos;
 using IdentityService.Enums;
 using IdentityService.ExtensionMethods;
@@ -40,6 +41,7 @@ namespace IdentityService.Controllers
         private readonly IStringLocalizer<AuthenticationController> _authLocalizer;
         private readonly AccountService _accountService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<UserController> _logger;
 
         public UserController(UserManager<ApplicationUser> userManager, 
             IPasswordHistory passwordHistory,
@@ -47,7 +49,8 @@ namespace IdentityService.Controllers
             ApiDbContext db,
             RoleManager<IdentityRole> roleManager,
             IStringLocalizer<AuthenticationController> authLocalizer,
-            AccountService accountService, IHttpClientFactory httpClientFactory)
+            AccountService accountService, IHttpClientFactory httpClientFactory,
+            ILogger<UserController> logger)
         {
             _userManager = userManager;
             _passwordHistory = passwordHistory;
@@ -57,6 +60,7 @@ namespace IdentityService.Controllers
             _authLocalizer = authLocalizer;
             _accountService = accountService;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -297,40 +301,51 @@ namespace IdentityService.Controllers
         [Route("resetpassword", Name = "ResetPassword")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
         {
-            var user = await _userManager.FindByEmailAsync(model.Email);
-
-            if (user == null)
+            try
             {
-                return BadRequest(_localizer["Usuario no encontrado"].Value);
-            }
+                var user = await _userManager.FindByEmailAsync(model.Email);
 
-            if (_passwordHistory.PasswordAlreadyExists(user.Id, model.Password))
-            {
-                return BadRequest(_localizer["Al parecer ya haz usado esta contraseña con anterioridad. Por favor, intenta con una diferente"].Value);
-            }
-            IdentityResult result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
-
-            if (result.Succeeded)
-            {
-                var pswModel = new Models.PasswordHistory()
+                if (user == null)
                 {
-                    CreateDate = DateTime.Now,
-                    PasswordHash = model.Password,
-                    UserId = user.Id
-                };
-                if (await _passwordHistory.SavePassword(pswModel))
-                {                    
-                    result = await _userManager.UpdateAsync(user);
-                    return Ok();
+                    _logger.LogWarning($"Reset password: usuario no encontrado con email {model.Email}");
+                    return BadRequest(_localizer["Usuario no encontrado"].Value);
+                }
+
+                if (_passwordHistory.PasswordAlreadyExists(user.Id, model.Password))
+                {
+                    return BadRequest(_localizer["Al parecer ya haz usado esta contraseña con anterioridad. Por favor, intenta con una diferente"].Value);
+                }
+                IdentityResult result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
+
+                if (result.Succeeded)
+                {
+                    var pswModel = new Models.PasswordHistory()
+                    {
+                        CreateDate = DateTime.Now,
+                        PasswordHash = model.Password,
+                        UserId = user.Id
+                    };
+                    if (await _passwordHistory.SavePassword(pswModel))
+                    {                    
+                        result = await _userManager.UpdateAsync(user);
+                        _logger.LogInformation($"Contraseña restablecida exitosamente para {model.Email}");
+                        return Ok();
+                    }
+                    else
+                    {
+                        return BadRequest(GetErrors(result));
+                    }
                 }
                 else
                 {
+                    _logger.LogWarning($"Fallo al restablecer contraseña para {model.Email}: {GetErrors(result)}");
                     return BadRequest(GetErrors(result));
                 }
             }
-            else
+            catch (Exception ex)
             {
-                return BadRequest(GetErrors(result));
+                _logger.LogError(ex, $"Error en ResetPassword para {model.Email}: {ex.Message}");
+                return StatusCode(500, "Error interno al restablecer la contraseña");
             }
         }
 
@@ -339,47 +354,62 @@ namespace IdentityService.Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword(ChangePasswordDto model)
         {
-            if (model == null || !ModelState.IsValid)
+            try
             {
-                return BadRequest(GetModelErrors());
-            }
-           
-            var userId = _userManager.GetUserId(HttpContext.User);
-            var user = await _userManager.FindByIdAsync(userId);
-
-            if (_passwordHistory.PasswordAlreadyExists(userId, model.NewPassword))
-            {
-                return BadRequest(_localizer["No puedes reusar contraseñas anteriores"].Value);
-            }
-            IdentityResult result = await _userManager.ChangePasswordAsync(user, model.OldPassword, model.NewPassword);
-
-            if (result.Succeeded)
-            {
-                if (!_passwordHistory.PasswordAlreadyExists(userId, user.PasswordHash))
+                if (model == null || !ModelState.IsValid)
                 {
+                    return BadRequest(GetModelErrors());
+                }
+           
+                var userId = _userManager.GetUserId(HttpContext.User);
+                var user = await _userManager.FindByIdAsync(userId);
 
-                    result = await _userManager.UpdateAsync(user);
-                    if (result.Succeeded)
+                if (user == null)
+                {
+                    _logger.LogError($"ChangePassword: usuario no encontrado con Id {userId}");
+                    return BadRequest(_localizer["Usuario no encontrado"].Value);
+                }
+
+                if (_passwordHistory.PasswordAlreadyExists(userId, model.NewPassword))
+                {
+                    return BadRequest(_localizer["No puedes reusar contraseñas anteriores"].Value);
+                }
+                IdentityResult result = await _userManager.ChangePasswordAsync(user, model.OldPassword, model.NewPassword);
+
+                if (result.Succeeded)
+                {
+                    if (!_passwordHistory.PasswordAlreadyExists(userId, user.PasswordHash))
                     {
-                        var pswHistory = new Models.PasswordHistory()
+
+                        result = await _userManager.UpdateAsync(user);
+                        if (result.Succeeded)
                         {
-                            CreateDate = DateTime.Now,
-                            PasswordHash = user.PasswordHash,
-                            UserId = userId
-                        };
-                        await _passwordHistory.SavePassword(pswHistory);
-                        return Ok();
+                            var pswHistory = new Models.PasswordHistory()
+                            {
+                                CreateDate = DateTime.Now,
+                                PasswordHash = user.PasswordHash,
+                                UserId = userId
+                            };
+                            await _passwordHistory.SavePassword(pswHistory);
+                            _logger.LogInformation($"Contraseña cambiada exitosamente para userId {userId}");
+                            return Ok();
+                        }
+                        return BadRequest(_localizer["No se pudo cambiar la contraseña por un error Interno"].Value);
                     }
-                    return BadRequest(_localizer["No se pudo cambiar la contraseña por un error Interno"].Value);
+                    else
+                    {
+                        return BadRequest(_localizer["No se pudo cambiar la contraseña por un error Interno"].Value);
+                    }
                 }
                 else
                 {
-                    return BadRequest(_localizer["No se pudo cambiar la contraseña por un error Interno"].Value);
+                    return BadRequest(GetErrors(result));
                 }
             }
-            else
+            catch (Exception ex)
             {
-                return BadRequest(GetErrors(result));
+                _logger.LogError(ex, $"Error en ChangePassword: {ex.Message}");
+                return StatusCode(500, "Error interno al cambiar la contraseña");
             }
         }
 
@@ -438,7 +468,7 @@ namespace IdentityService.Controllers
                         await CreateUserInEvantix(domainUser, authorizationTokens.Value.access_token, authorizationTokens.Value.role ?? "User");
                     }
                 }
-                catch (Exception) { /* No bloquear login si falla el registro en Evantix */ }
+                catch (Exception ex) { _logger.LogWarning($"Fallo al registrar usuario Google en Evantix: {ex.Message}"); }
 
                 return Ok(retVal);
             }
@@ -491,7 +521,7 @@ namespace IdentityService.Controllers
                         await CreateUserInEvantix(domainUser, authorizationTokens.Value.access_token, authorizationTokens.Value.role ?? "User");
                     }
                 }
-                catch (Exception) { /* No bloquear login si falla el registro en Evantix */ }
+                catch (Exception ex) { _logger.LogWarning($"Fallo al registrar usuario Facebook en Evantix: {ex.Message}"); }
 
                 return Ok(retVal);
             }
