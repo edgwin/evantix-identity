@@ -1,4 +1,4 @@
-﻿using IdentityService.ExternalProvider;
+using IdentityService.ExternalProvider;
 using Newtonsoft.Json;
 using System;
 using System.Net.Http;
@@ -15,7 +15,7 @@ namespace IdentityService.Services
         {
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("https://graph.facebook.com/v2.8/")
+                BaseAddress = new Uri("https://graph.facebook.com/v25.0/")
             };
             _httpClient.DefaultRequestHeaders
                 .Accept
