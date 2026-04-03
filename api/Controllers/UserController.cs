@@ -1,4 +1,3 @@
-using Azure.Core;
 using Microsoft.Extensions.Logging;
 using IdentityService.Dtos;
 using IdentityService.Enums;

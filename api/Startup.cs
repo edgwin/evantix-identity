@@ -70,7 +70,7 @@ namespace IdentityService
             .AddErrorDescriber<SpanishIdentityErrorDescriber>();
 
             var efConnection = Configuration["DefaultConnection"];
-            services.AddDbContext<ApiDbContext>(options => options.UseSqlServer(efConnection));
+            services.AddDbContext<ApiDbContext>(options => options.UseNpgsql(efConnection));
             services.AddHttpClient();
 
             // return 401 instead of redirect to login
