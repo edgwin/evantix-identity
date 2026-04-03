@@ -1,4 +1,4 @@
-﻿using IdentityService.Models;
+using IdentityService.Models;
 using IdentityService.Providers;
 using IdentityService.Services;
 using IdentityService.Utils.Interfaces;
@@ -176,7 +176,10 @@ namespace IdentityService
             app.UseStaticFiles();            
             app.UseMiddleware<TokenProviderMiddleware>();
             app.UseAuthentication();
-            app.UseSwagger();
+            app.UseSwagger(c =>
+            {
+                c.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_0;
+            });
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity API");
