@@ -1,4 +1,4 @@
-﻿using IdentityService.Models;
+using IdentityService.Models;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +12,9 @@ namespace IdentityService
     {
         public static void Main(string[] args)
         {
+            // Enable legacy timestamp behavior so Npgsql accepts DateTime with Kind=Local/Unspecified
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
             var host = BuildWebHost(args);
 
             using (var scope = host.Services.CreateScope())
@@ -21,7 +24,8 @@ namespace IdentityService
                 {
                     var userManager = services.GetRequiredService<UserManager<ApplicationUser>> ();
                     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-                    ApiDbSeedData.Seed(userManager, roleManager).Wait();
+                    var dbContext = services.GetRequiredService<ApiDbContext>();
+                    ApiDbSeedData.Seed(userManager, roleManager, dbContext).Wait();
                 }
                 catch (Exception ex)
                 {

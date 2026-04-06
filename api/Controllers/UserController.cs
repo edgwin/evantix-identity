@@ -117,7 +117,7 @@ namespace IdentityService.Controllers
                     //Add password to passwordHistory
                     var passwordModel = new Models.PasswordHistory()
                     {
-                        CreateDate = DateTime.Now,
+                        CreateDate = DateTime.UtcNow,
                         PasswordHash = user.PasswordHash,
                         UserId = user.Id,
                         AppId = model.AppId
@@ -320,7 +320,7 @@ namespace IdentityService.Controllers
                 {
                     var pswModel = new Models.PasswordHistory()
                     {
-                        CreateDate = DateTime.Now,
+                        CreateDate = DateTime.UtcNow,
                         PasswordHash = model.Password,
                         UserId = user.Id
                     };
@@ -385,7 +385,7 @@ namespace IdentityService.Controllers
                         {
                             var pswHistory = new Models.PasswordHistory()
                             {
-                                CreateDate = DateTime.Now,
+                                CreateDate = DateTime.UtcNow,
                                 PasswordHash = user.PasswordHash,
                                 UserId = userId
                             };

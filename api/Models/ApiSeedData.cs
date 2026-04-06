@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,10 +15,10 @@ namespace IdentityService.Models
 
         }
 
-        public static async Task Seed(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+        public static async Task Seed(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ApiDbContext dbContext)
         {
             await SeedRolesAndClaims(userManager, roleManager);
-            await SeedAdmin(userManager);
+            await SeedAdmin(userManager, dbContext);
         }
 
         private static async Task SeedRolesAndClaims(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
@@ -60,19 +61,20 @@ namespace IdentityService.Models
             }
         }
 
-        private static async Task SeedAdmin(UserManager<ApplicationUser> userManager)
+        private static async Task SeedAdmin(UserManager<ApplicationUser> userManager, ApiDbContext dbContext)
         {
-            var u = await userManager.FindByNameAsync("admin");
+            var u = await userManager.FindByNameAsync("edgwin@hotmail.com");
             if (u == null)
             {
                 u = new ApplicationUser
                 {
-                    UserName = "admin",
-                    Email = "admin@nothing.com",
+                    UserName = "edgwin@hotmail.com",
+                    Email = "edgwin@hotmail.com",
                     SecurityStamp = Guid.NewGuid().ToString(),
                     IsEnabled = true,
-                    FirstName = "admin",
-                    LastName = "user"
+                    EmailConfirmed = true,
+                    FirstName = "Admin",
+                    LastName = "User"
                 };
                 var x = await userManager.CreateAsync(u, "Admin1234!");
             }
@@ -83,6 +85,26 @@ namespace IdentityService.Models
             }
             if(!await userManager.IsInRoleAsync(u, Extensions.AdminRole))
                 await userManager.AddToRoleAsync(u, Extensions.AdminRole);
+
+            // Associate admin user with the Evantix application
+            var evantixApp = await dbContext.Applications.FirstOrDefaultAsync(a => a.Nombre == "Evantix");
+            if (evantixApp != null)
+            {
+                var existingAssoc = await dbContext.UserApplications
+                    .AnyAsync(ua => ua.ApplicationUser.Id == u.Id && ua.Applications.Id == evantixApp.Id);
+
+                if (!existingAssoc)
+                {
+                    dbContext.UserApplications.Add(new UsersApplications
+                    {
+                        ApplicationUser = u,
+                        Applications = evantixApp,
+                        EmailConfirmed = true
+                    });
+                    await dbContext.SaveChangesAsync();
+                }
+            }
         }
     }
 }
+

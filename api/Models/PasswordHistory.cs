@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace IdentityService.Models
@@ -7,13 +7,13 @@ namespace IdentityService.Models
     {
         public PasswordHistory()
         {
-            CreateDate = DateTime.Now;
+            CreateDate = DateTime.UtcNow;
         }
         public PasswordHistory(string userId, string passwordHash)
         {
             UserId = userId;
             PasswordHash = passwordHash;
-            CreateDate = DateTime.Now;
+            CreateDate = DateTime.UtcNow;
         }
 
         [Column(Order = 0)]

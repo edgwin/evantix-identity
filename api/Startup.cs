@@ -70,7 +70,8 @@ namespace IdentityService
             .AddErrorDescriber<SpanishIdentityErrorDescriber>();
 
             var efConnection = Configuration["DefaultConnection"];
-            services.AddDbContext<ApiDbContext>(options => options.UseNpgsql(efConnection));
+            services.AddDbContext<ApiDbContext>(options => options.UseNpgsql(efConnection)
+                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
             services.AddHttpClient();
 
             // return 401 instead of redirect to login
