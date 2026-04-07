@@ -1,0 +1,96 @@
+# =============================================================================
+# Azure DevOps CI/CD Pipeline — Identity API
+# Triggers on push to main → builds, publishes, deploys to VPS via SSH
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '10.0.x'
+  publishDir: '$(Build.ArtifactStagingDirectory)/identity-api'
+  serviceName: 'evantix-identity'
+  remoteDir: '/opt/evantix/identity-api'
+
+stages:
+  - stage: Build
+    displayName: 'Build & Publish'
+    jobs:
+      - job: BuildJob
+        displayName: 'dotnet publish'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET 10'
+            inputs:
+              packageType: 'sdk'
+              version: '$(dotnetVersion)'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore packages'
+            inputs:
+              command: 'restore'
+              projects: 'api/IdentityService.csproj'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish for Linux x64'
+            inputs:
+              command: 'publish'
+              projects: 'api/IdentityService.csproj'
+              arguments: '-c $(buildConfiguration) -r linux-x64 --self-contained false -o $(publishDir)'
+              publishWebProjects: false
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Upload artifact'
+            inputs:
+              PathtoPublish: '$(publishDir)'
+              ArtifactName: 'identity-api'
+
+  - stage: Deploy
+    displayName: 'Deploy to VPS'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: DeployToVPS
+        displayName: 'Deploy Identity API'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@1
+                  displayName: 'Download artifact'
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'identity-api'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: CopyFilesOverSSH@0
+                  displayName: 'Upload to VPS'
+                  inputs:
+                    sshEndpoint: 'evantix-vps'
+                    sourceFolder: '$(System.ArtifactsDirectory)/identity-api'
+                    contents: '**'
+                    targetFolder: '/tmp/deploy-identity-api'
+                    cleanTargetFolder: true
+
+                - task: SSH@0
+                  displayName: 'Stop, replace, restart service'
+                  inputs:
+                    sshEndpoint: 'evantix-vps'
+                    runOptions: 'inline'
+                    inline: |
+                      sudo systemctl stop $(serviceName) || true
+                      sudo rm -rf $(remoteDir)/*
+                      sudo cp -r /tmp/deploy-identity-api/* $(remoteDir)/
+                      sudo chown -R evantix:evantix $(remoteDir)
+                      sudo systemctl start $(serviceName)
+                      sleep 3
+                      sudo systemctl status $(serviceName) --no-pager
+                      echo "Deploy complete: $(date)"
