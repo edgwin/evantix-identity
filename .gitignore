@@ -261,3 +261,12 @@ __pycache__/
 *.pyc
 api/id_build2.txt
 api/id_restore.txt
+
+# ─── Secrets — NUNCA en el repositorio ──────────────────────────────────────
+api/appsettings.Development.json
+*.env
+.env
+.env.local
+secrets.json
+**/secrets/
+**/secrets.json
