@@ -1,4 +1,4 @@
-﻿using IdentityService.Models;
+using IdentityService.Models;
 using IdentityService.Providers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace IdentityService.Utils
@@ -63,12 +64,35 @@ namespace IdentityService.Utils
                 expires: now.Add(options.Expiration),
                 signingCredentials: options.SigningCredentials);
             var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
+
+            // ── Generate and persist refresh token ──────────────────────────────
+            // Revoke all existing active refresh tokens for this user (rotation)
+            var activeTokens = _db.RefreshTokens
+                .Where(rt => rt.UserId == user.Id && rt.RevokedUtc == null && rt.ExpiresUtc > now)
+                .ToList();
+            foreach (var t in activeTokens)
+            {
+                t.RevokedUtc = now;
+            }
+
+            var refreshTokenValue = GenerateRefreshToken();
+            var refreshTokenEntity = new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshTokenValue,
+                ExpiresUtc = now.AddDays(7),
+                CreatedUtc = now
+            };
+            _db.RefreshTokens.Add(refreshTokenEntity);
+            _db.SaveChanges();
+            // ────────────────────────────────────────────────────────────────────
             
             var applicationInfo = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
                 .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == appId).FirstOrDefault();            
             var response = new LoginResponseData
             {
                 access_token = encodedJwt,
+                refresh_token = refreshTokenValue,
                 expires_in = (int)options.Expiration.TotalSeconds,
                 userName = user.UserName,
                 firstName = user.FirstName,
@@ -82,6 +106,18 @@ namespace IdentityService.Utils
             };
             return response;
         }
+
+        /// <summary>
+        /// Generate a cryptographically secure random string for use as a refresh token.
+        /// </summary>
+        private static string GenerateRefreshToken()
+        {
+            var randomBytes = new byte[64];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            return Convert.ToBase64String(randomBytes);
+        }
     }
 
 }
+

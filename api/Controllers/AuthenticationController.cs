@@ -137,5 +137,125 @@ namespace IdentityService.Controllers
             var redirectUri = Uri.EscapeDataString(_configuration["LinkedInAuth:RedirectUri"]);
             return Redirect($"{authUrl}?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&state=1&scope=r_emailaddress%20r_liteprofile");
         }     
+
+        /// <summary>
+        /// Exchange a valid refresh token for a new access_token + refresh_token pair.
+        /// Implements refresh token rotation: the old token is revoked immediately.
+        /// </summary>
+        [HttpPost]
+        [Route("RefreshToken")]
+        [AllowAnonymous]
+        [EnableRateLimiting("LoginEndpoint")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request?.Token))
+                    return BadRequest("Se requiere el refresh token.");
+
+                var existingToken = await _db.RefreshTokens
+                    .Include(rt => rt.User)
+                    .FirstOrDefaultAsync(rt => rt.Token == request.Token);
+
+                if (existingToken == null || !existingToken.IsActive)
+                {
+                    _logger.LogWarning("Refresh token inválido o expirado.");
+                    return Unauthorized("Token de actualización inválido o expirado.");
+                }
+
+                var user = existingToken.User;
+                if (user == null || !user.IsEnabled)
+                {
+                    _logger.LogWarning($"Refresh token para usuario deshabilitado: {existingToken.UserId}");
+                    return Unauthorized("Usuario deshabilitado.");
+                }
+
+                // Find appId for the user
+                var userApp = await _db.UserApplications
+                    .Include(a => a.Applications)
+                    .FirstOrDefaultAsync(up => up.ApplicationUser.Id == user.Id);
+                if (userApp == null)
+                    return BadRequest("No se encontró la aplicación del usuario.");
+
+                var appToken = userApp.Applications.AppToken;
+                var appId = userApp.Applications.AppId;
+
+                // Generate new tokens (this also revokes old refresh tokens via rotation)
+                var response = GetLoginToken.Execute(user, _db, appId, appToken);
+                
+                var retVal = new UserResultType()
+                {
+                    access_token = response.access_token,
+                    refresh_token = response.refresh_token,
+                    appId = response.appId,
+                    appHomePage = response.appHomePage,
+                    appName = response.appName,
+                    expires_in = response.expires_in,
+                    User = new UserResult()
+                    {
+                        userId = user.Id,
+                        firstName = response.firstName,
+                        lastName = response.lastName,
+                        role = response.role,
+                        userName = response.userName,
+                        email = response.email,
+                        picture = response.picture
+                    }
+                };
+
+                _logger.LogInformation($"Token refreshed para: {user.UserName}");
+                return Ok(retVal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en RefreshToken");
+                return StatusCode(500, "Error interno durante la renovación del token.");
+            }
+        }
+
+        /// <summary>
+        /// Revoke a refresh token (logout).
+        /// </summary>
+        [HttpPost]
+        [Route("RevokeToken")]
+        [Authorize]
+        public async Task<IActionResult> RevokeToken([FromBody] RefreshTokenRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request?.Token))
+                    return BadRequest("Se requiere el refresh token.");
+
+                var token = await _db.RefreshTokens
+                    .FirstOrDefaultAsync(rt => rt.Token == request.Token);
+                
+                if (token == null)
+                    return NotFound("Token no encontrado.");
+
+                // Only the owner or an admin can revoke a token
+                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (token.UserId != userId && !User.IsInRole("Administrator"))
+                    return StatusCode(403, "No tienes permiso para revocar este token.");
+
+                if (token.RevokedUtc == null)
+                {
+                    token.RevokedUtc = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                }
+
+                _logger.LogInformation($"Refresh token revocado para userId: {token.UserId}");
+                return Ok(new { message = "Token revocado exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en RevokeToken");
+                return StatusCode(500, "Error interno al revocar el token.");
+            }
+        }
+    }
+
+    public class RefreshTokenRequest
+    {
+        public string Token { get; set; }
     }
 }

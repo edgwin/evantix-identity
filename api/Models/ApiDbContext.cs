@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace IdentityService.Models
@@ -16,6 +16,7 @@ namespace IdentityService.Models
         public DbSet<PasswordHistory> PasswordHistory { get; set; }
         public DbSet<Applications> Applications { get; set; }
         public DbSet<UsersApplications> UserApplications { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {            
