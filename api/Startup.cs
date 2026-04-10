@@ -159,12 +159,14 @@ namespace IdentityService
                     {
                         OnAuthenticationFailed = context =>
                         {
-                            Console.WriteLine("OnAuthenticationFailed: " + context.Exception.Message);
+                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Startup>>();
+                            logger.LogWarning("OnAuthenticationFailed: {Message}", context.Exception.Message);
                             return Task.CompletedTask;
                         },
                         OnTokenValidated = context =>
                         {
-                            Console.WriteLine("OnTokenValidated: " + context.SecurityToken);
+                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Startup>>();
+                            logger.LogInformation("OnTokenValidated: Token from issuer {Issuer} validated successfully.", context.SecurityToken.Issuer);
                             return Task.CompletedTask;
                         }
                     };
