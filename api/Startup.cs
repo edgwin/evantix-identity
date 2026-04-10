@@ -15,7 +15,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +37,28 @@ namespace IdentityService
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // ── Validación de configuración requerida al inicio ────────────────────────
+            var requiredSettings = new[]
+            {
+                "TokenAuthentication:SecretKey",
+                "DefaultConnection",
+            };
+            var missingSettings = requiredSettings
+                .Where(key => string.IsNullOrWhiteSpace(Configuration[key]))
+                .ToList();
+
+            if (missingSettings.Any())
+            {
+                var env = CurrentEnvironment ?? "Unknown";
+                var missing = string.Join("\n  - ", missingSettings);
+                throw new InvalidOperationException(
+                    $"\n\n⚠️  IDENTITY — CONFIGURACIÓN INCOMPLETA (entorno: {env})\n" +
+                    $"Los siguientes valores son requeridos y están vacíos:\n  - {missing}\n\n" +
+                    $"En desarrollo: configúralos en appsettings.Development.json\n" +
+                    $"En producción: configúralos en el archivo de variables de entorno del servicio systemd\n");
+            }
+            // ────────────────────────────────────────────────────────────────────────────
+
             services.AddCors(options =>
             {
                 options.AddPolicy("CorsPolicy", builder =>
@@ -83,7 +107,12 @@ namespace IdentityService
                 };
             });
 
-            services.AddAuthentication(sharedOptions =>
+            // ── Social login: registrar solo si están configurados ─────────────────────
+            // Evita errores de startup en entornos donde no se usa social login
+            var facebookAppId = Configuration["FacebookAuth:AppId"];
+            var linkedInClientId = Configuration["LinkedInAuth:ClientId"];
+
+            var authBuilder = services.AddAuthentication(sharedOptions =>
             {
                 sharedOptions.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 sharedOptions.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -112,22 +141,31 @@ namespace IdentityService
                         },
                         OnTokenValidated = context =>
                         {
-                            Console.WriteLine("OnTokenValidated: " +
-                                              context.SecurityToken);
+                            Console.WriteLine("OnTokenValidated: " + context.SecurityToken);
                             return Task.CompletedTask;
                         }
                     };
+                });
 
-                })
-                .AddFacebook(options =>
+            if (!string.IsNullOrEmpty(facebookAppId))
+            {
+                authBuilder.AddFacebook(options =>
                 {
                     options.AppId = Configuration["FacebookAuth:AppId"];
                     options.AppSecret = Configuration["FacebookAuth:AppSecret"];
-                })
-                .AddLinkedIn(options => {
-                    options.ClientId = Configuration["LinkedInAuth:ClientId"];
-                    options.ClientSecret = Configuration["LinkedInAuth:ClientSecret"];                                  
                 });
+            }
+
+            if (!string.IsNullOrEmpty(linkedInClientId))
+            {
+                authBuilder.AddLinkedIn(options =>
+                {
+                    options.ClientId = Configuration["LinkedInAuth:ClientId"];
+                    options.ClientSecret = Configuration["LinkedInAuth:ClientSecret"];
+                });
+            }
+            // ────────────────────────────────────────────────────────────────────────────
+
             
             services.AddSwaggerGen(c =>
             {
