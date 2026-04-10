@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 
 namespace IdentityService
@@ -202,6 +204,33 @@ namespace IdentityService
             services.AddScoped<FacebookService, FacebookService>();
             services.AddScoped<SharedResource, SharedResource>();
             services.AddScoped<LinkedInService, LinkedInService>();
+
+            // ── Rate Limiting para endpoints de autenticación ──────────────────
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = 429;
+
+                // Global: 60 requests/min per IP
+                options.GlobalLimiter = PartitionedRateLimiter.Create<Microsoft.AspNetCore.Http.HttpContext, string>(context =>
+                {
+                    var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    return RateLimitPartition.GetFixedWindowLimiter(remoteIp, _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    });
+                });
+
+                // Login: 5 requests/min per IP (brute force protection)
+                options.AddFixedWindowLimiter("LoginEndpoint", opt =>
+                {
+                    opt.PermitLimit = 5;
+                    opt.Window = TimeSpan.FromMinutes(1);
+                    opt.QueueLimit = 0;
+                });
+            });
+            // ────────────────────────────────────────────────────────────────────
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -236,6 +265,7 @@ namespace IdentityService
             app.UseStaticFiles();            
             app.UseMiddleware<TokenProviderMiddleware>();
             app.UseAuthentication();
+            app.UseRateLimiter();
             app.UseSwagger(c =>
             {
                 c.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_0;

@@ -9,6 +9,7 @@ using IdentityService.Utils.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Localization;
@@ -53,6 +54,7 @@ namespace IdentityService.Controllers
         [HttpPost]
         [Route("Authentication")]
         [AllowAnonymous]
+        [EnableRateLimiting("LoginEndpoint")]
         public async Task<IActionResult> Authenticate([FromBody] AuthenticateDto request)
         {
             try
