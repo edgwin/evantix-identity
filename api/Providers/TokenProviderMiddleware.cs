@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using System;
 using System.Threading.Tasks;
@@ -57,7 +57,13 @@ namespace IdentityService.Providers
                 var signInManager = context.RequestServices.GetService<SignInManager<ApplicationUser>>();
                 var userManager = context.RequestServices.GetService<UserManager<ApplicationUser>>();
 
-                var result = await signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: false);
+                var result = await signInManager.PasswordSignInAsync(username, password, false, lockoutOnFailure: true);
+                if (result.IsLockedOut)
+                {
+                    context.Response.StatusCode = 429;
+                    await context.Response.WriteAsync("Account locked. Too many failed attempts. Try again in 15 minutes.");
+                    return;
+                }
                 if (!result.Succeeded)
                 {
                     context.Response.StatusCode = 400;

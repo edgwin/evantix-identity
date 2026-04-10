@@ -59,14 +59,29 @@ namespace IdentityService
             }
             // ────────────────────────────────────────────────────────────────────────────
 
+            // ── CORS: orígenes permitidos desde configuración ────────────────────────
+            // En producción se restringe a dominios específicos (ej. "https://evantix.mx")
+            // En desarrollo se permite localhost
+            var allowedOrigins = Configuration.GetSection("CorsSettings:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
             services.AddCors(options =>
             {
                 options.AddPolicy("CorsPolicy", builder =>
                 {
-                    builder.AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .SetIsOriginAllowed(origin => true)
-                    .AllowCredentials();
+                    if (allowedOrigins.Length > 0)
+                    {
+                        builder.WithOrigins(allowedOrigins)
+                               .AllowAnyHeader()
+                               .AllowAnyMethod()
+                               .AllowCredentials();
+                    }
+                    else
+                    {
+                        // Fallback restrictivo: solo mismo origen (sin CORS)
+                        builder.AllowAnyHeader()
+                               .AllowAnyMethod();
+                    }
                 });
             });
 
@@ -87,6 +102,12 @@ namespace IdentityService
             {
                 options.Password.RequireNonAlphanumeric = true;
                 options.Password.RequiredLength = 8;
+
+                // ── Lockout: protección contra brute force ─────────────────────────────
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.AllowedForNewUsers = true;
+                // ───────────────────────────────────────────────────────────────────────
             })
             .AddEntityFrameworkStores<ApiDbContext>()
             .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>("EmailConfirm")

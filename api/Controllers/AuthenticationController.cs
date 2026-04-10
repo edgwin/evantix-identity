@@ -60,7 +60,12 @@ namespace IdentityService.Controllers
                 if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
                     return BadRequest(_localizer["El usuario y password no deben estar vacios"].Value);
 
-                var result = await _signInManager.PasswordSignInAsync(request.UserName, request.Password, false, lockoutOnFailure: false);
+                var result = await _signInManager.PasswordSignInAsync(request.UserName, request.Password, false, lockoutOnFailure: true);
+                if (result.IsLockedOut)
+                {
+                    _logger.LogWarning($"Cuenta bloqueada por intentos fallidos: {request.UserName}");
+                    return BadRequest(_localizer["Cuenta bloqueada temporalmente por demasiados intentos fallidos. Intente de nuevo en 15 minutos."].Value);
+                }
                 if (!result.Succeeded)
                 {
                     _logger.LogWarning($"Intento de login fallido para usuario: {request.UserName}");
