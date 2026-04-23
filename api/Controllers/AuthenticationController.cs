@@ -215,10 +215,11 @@ namespace IdentityService.Controllers
 
         /// <summary>
         /// Revoke a refresh token (logout).
+        /// The refresh token itself is the credential — no access token required.
         /// </summary>
         [HttpPost]
         [Route("RevokeToken")]
-        [Authorize]
+        [AllowAnonymous]
         public async Task<IActionResult> RevokeToken([FromBody] RefreshTokenRequest request)
         {
             try
@@ -231,11 +232,6 @@ namespace IdentityService.Controllers
                 
                 if (token == null)
                     return NotFound("Token no encontrado.");
-
-                // Only the owner or an admin can revoke a token
-                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (token.UserId != userId && !User.IsInRole("Administrator"))
-                    return StatusCode(403, "No tienes permiso para revocar este token.");
 
                 if (token.RevokedUtc == null)
                 {
