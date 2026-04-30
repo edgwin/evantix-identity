@@ -1,0 +1,42 @@
+name: Deploy Identity API
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        run: |
+          dotnet publish api/IdentityService.csproj \
+            -c Release -r linux-x64 --self-contained false \
+            -o ./publish
+
+      - name: Deploy to VPS
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+          SSH="ssh -i ~/.ssh/id_deploy ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          SCP="scp -i ~/.ssh/id_deploy"
+
+          $SSH "sudo systemctl stop evantix-identity || true"
+          $SSH "cp /opt/evantix/identity-api/appsettings.Production.json /tmp/_identity_prod.json 2>/dev/null || true"
+          $SCP -r ./publish/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/evantix/identity-api/
+          $SSH "cp /tmp/_identity_prod.json /opt/evantix/identity-api/appsettings.Production.json 2>/dev/null || true"
+          $SSH "sudo chown -R evantix:evantix /opt/evantix/identity-api"
+          $SSH "sudo systemctl start evantix-identity"
+          sleep 5
+          $SSH "curl -sf http://localhost:5002/api/health > /dev/null && echo 'Identity API: ✅' || echo 'Identity API: ❌'"
