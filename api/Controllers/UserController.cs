@@ -266,15 +266,22 @@ namespace IdentityService.Controllers
 
                 if (user == null)
                 {
+                    _logger.LogWarning($"ForgotPassword: usuario no encontrado con email {email}");
                     return BadRequest(_localizer["No se encontro el usuario"].Value);
                 }
 
                 string code = await _userManager.GeneratePasswordResetTokenAsync(user);
-                //string resetUrl = GetProtocolUrl() + HttpContext.Current.Request.Url.Authority + "/home/resetpassword?code=" + code;
 
-                //string resetUrl = string.Format("{0}/api/User/resetpassword?code={1}", UrlHelper.GetUrlAuthority(HttpContext), code);
-                var systemUrl = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
-                                    .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == request.AppId).FirstOrDefault().Applications.HomePage;
+                var userApp = _db.UserApplications.Where(up => up.ApplicationUser.Id == user.Id)
+                                    .Include(a => a.Applications).ToList().Where(c => c.Applications.AppId == request.AppId).FirstOrDefault();
+
+                if (userApp == null)
+                {
+                    _logger.LogWarning($"ForgotPassword: no se encontró aplicación con AppId {request.AppId} para el usuario {email}");
+                    return BadRequest(_localizer["No se encontro el usuario"].Value);
+                }
+
+                var systemUrl = userApp.Applications.HomePage;
                 string resetUrl = string.Format("{0}forgotPassword?code={1}&email={2}", systemUrl, Uri.EscapeDataString(code), Uri.EscapeDataString(email));
                 var system = "Evantix";
                 var emailDto = new EmailDto()
@@ -291,6 +298,7 @@ namespace IdentityService.Controllers
                 return Ok();
             }catch(Exception ex)
             {
+                _logger.LogError(ex, $"Error en ForgotPassword: {ex.Message}");
                 return BadRequest(ex.Message);
             }
         }
