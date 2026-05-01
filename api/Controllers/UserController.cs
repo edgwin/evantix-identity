@@ -525,31 +525,6 @@ namespace IdentityService.Controllers
                 return Ok(retVal);
             }
             return BadRequest(authorizationTokens.Message);
-        }
-
-        private static string HashPassword(string password)
-        {
-            // Salt = aleatorio para que el mismo password no genere el mismo hash
-            byte[] salt = RandomNumberGenerator.GetBytes(16); // 16 bytes = 128 bits
-            var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
-
-            byte[] hash = pbkdf2.GetBytes(32); // 32 bytes = 256 bits
-            byte[] hashBytes = new byte[48]; // 16 + 32
-
-            // Juntamos el salt + hash en un solo array para guardarlo
-            Array.Copy(salt, 0, hashBytes, 0, 16);
-            Array.Copy(hash, 0, hashBytes, 16, 32);
-
-            // Lo convertimos en string (Base64) para guardarlo en base de datos
-            return Convert.ToBase64String(hashBytes);
-        }
-
-        private static string GenerateRandomString(int length)
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            Random random = new Random();
-            return new string(Enumerable.Repeat(chars, length)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
-        }
+        }        
     }
 }
